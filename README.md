@@ -24,9 +24,9 @@ npm install
 PORT=3000
 # Debe apuntar al nuevo endpoint de autorizacin: /api/transacciones/autorizar
 BANK_API_URL=http://localhost:3001/api/transacciones
-DB_USER=sqladmin
-DB_PASSWORD=Willi04.
-DB_SERVER=bancogt.database.windows.net
+DB_USER=sa
+DB_PASSWORD=
+DB_SERVER=
 DB_DATABASE=Banco
 ```
 
