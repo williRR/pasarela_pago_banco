@@ -12,7 +12,7 @@ app.use(bodyParser.json());
 app.use("/api/payments", paymentRoutes);
 
 // Puerto
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT;
 app.listen(PORT, () => {
   console.log(`Pasarela de pago corriendo en http://localhost:${PORT}`);
 });
