@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: services/bankService.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: services/bankService.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>// src/services/bankService.js
+import axios from "axios";
+import { BANK_API_URL } from "../config.js";
+import { registerInitialTransaction, updateTransactionStatus } from "../models/transactions.js";
+
+// --- Documentación de Tipos de Datos (Schemas) ---
+
+/**
+ * @typedef {object} PaymentRequest
+ * @property {string} merchantId - ID único del comercio.
+ * @property {number} amount - Monto de la transacción (Decimal 18, 2).
+ * @property {string} cardNumber - Número de tarjeta de crédito.
+ * @property {string} expDate - Fecha de expiración de la tarjeta (MM/AA).
+ * @property {string} cvv - Código de seguridad.
+ */
+
+/**
+ * @typedef {object} PaymentResult
+ * @property {boolean} success - Indica si la transacción fue exitosa.
+ * @property {number} transactionId - El ID de la transacción generado por la pasarela.
+ * @property {string} message - Mensaje descriptivo del resultado (éxito o fallo).
+ */
+
+// --- Documentación de la Función ---
+
+/**
+ * Procesa un pago: registra la transacción, llama a la API del banco y actualiza el estado final.
+ *
+ * Esta función es el orquestador principal del flujo de la pasarela.
+ *
+ * @async
+ * @function processPayment
+ * @param {PaymentRequest} params - Objeto que contiene todos los datos necesarios para procesar el pago.
+ * @returns {Promise&lt;PaymentResult>} Retorna una Promesa que se resuelve con un objeto de resultado
+ * indicando el éxito/fallo y los detalles finales.
+ */
+export async function processPayment({ merchantId, amount, cardNumber, expDate, cvv }) {
+    let pasarelaTxId = null; // ID de transaccin de la Pasarela
+
+    try {
+        // 1. Registrar la transaccin como PENDIENTE
+        pasarelaTxId = await registerInitialTransaction({ merchantId, amount, cardNumber });
+
+        // 2. Peticin al banco ficticio
+        const bankResponse = await axios.post(`${BANK_API_URL}/autorizar`, {
+            tarjcodigo: cardNumber, // Usamos el nombre de campo que espera la API de Banco
+            monto: amount,
+            // (Opcional) puedes incluir emplcodigo y tipocodigo si el banco los necesita
+        });
+
+        // 3. Respuesta EXITOSA del BANCO (HTTP 200)
+        const finalStatus = bankResponse.data.status; // 'APROBADO'
+        const finalMessage = bankResponse.data.mensaje;
+        const cuentaReferencia = bankResponse.data.cuentacodigo || null; // Si el banco devuelve la cuenta afectada
+
+        // 4. Actualizar el estado final en la Pasarela (APROBADO)
+        await updateTransactionStatus({
+            transactionId: pasarelaTxId,
+            status: finalStatus,
+            message: finalMessage,
+            cuentaReferencia: cuentaReferencia
+        });
+
+        return {
+            success: true,
+            transactionId: pasarelaTxId,
+            message: finalMessage
+        };
+
+    } catch (error) {
+        // Manejar RECHAZOS (HTTP 400 del banco) o FALLOS (HTTP 500/Red)
+        let finalStatus = 'FALLIDO';
+        let finalMessage = "Error de red o servidor.";
+
+        if (error.response &amp;&amp; error.response.status === 400) {
+            // El banco rechaz el pago por fondos insuficientes, etc.
+            finalStatus = 'RECHAZADO';
+            finalMessage = error.response.data.mensaje; 
+        }
+
+        // 4b. Actualizar el estado como RECHAZADO o FALLIDO
+        if (pasarelaTxId) {
+            await updateTransactionStatus({
+                transactionId: pasarelaTxId,
+                status: finalStatus,
+                message: finalMessage
+            });
+        }
+        
+        return { 
+            success: false, 
+            message: finalMessage, 
+            transactionId: pasarelaTxId 
+        };
+    }
+}</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-config.html">config</a></li><li><a href="module-routes_payment.html">routes/payment</a></li></ul><h3>Global</h3><ul><li><a href="global.html#processPayment">processPayment</a></li><li><a href="global.html#registerInitialTransaction">registerInitialTransaction</a></li><li><a href="global.html#updateTransactionStatus">updateTransactionStatus</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Mon Oct 06 2025 15:56:12 GMT-0600 (Central Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
