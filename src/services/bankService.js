@@ -1,65 +1,91 @@
+
 // src/services/bankService.js
 import axios from "axios";
 import { BANK_API_URL } from "../config.js";
 import { registerInitialTransaction, updateTransactionStatus } from "../models/transactions.js";
 
+/**
+ * Procesa un pago completo a través de la pasarela y el banco.
+ * @param {object} params
+ * @param {string} params.merchantId
+ * @param {number} params.amount
+ * @param {string} params.cardNumber
+ * @param {string} params.expDate
+ * @param {string} params.cvv
+ * @returns {Promise<{success: boolean, transactionId: number, message: string, errorCode?: string}>}
+ */
 export async function processPayment({ merchantId, amount, cardNumber, expDate, cvv }) {
-    let pasarelaTxId = null; // ID de transaccin de la Pasarela
+  let pasarelaTxId = null;
 
-    try {
-        // 1. Registrar la transaccin como PENDIENTE
-        pasarelaTxId = await registerInitialTransaction({ merchantId, amount, cardNumber });
+  try {
+    // 1️⃣ Registrar transacción inicial
+    pasarelaTxId = await registerInitialTransaction({ merchantId, amount, cardNumber });
 
-        // 2. Peticin al banco ficticio
-        const bankResponse = await axios.post(`${BANK_API_URL}/autorizar`, {
-            tarjcodigo: cardNumber, // Usamos el nombre de campo que espera la API de Banco
-            monto: amount,
-            // (Opcional) puedes incluir emplcodigo y tipocodigo si el banco los necesita
-        });
+    // 2️⃣ Llamada segura al banco
+    const bankResponse = await axios.post(
+      `${BANK_API_URL}/autorizar`,
+      {
+        tarjcodigo: cardNumber,
+        monto: amount,
+      },
+      {
+        timeout: 5000,
+        validateStatus: (status) => status < 500,
+      }
+    );
 
-        // 3. Respuesta EXITOSA del BANCO (HTTP 200)
-        const finalStatus = bankResponse.data.status; // 'APROBADO'
-        const finalMessage = bankResponse.data.mensaje;
-        const cuentaReferencia = bankResponse.data.cuentacodigo || null; // Si el banco devuelve la cuenta afectada
+    const { status, mensaje, cuentacodigo, codigo } = bankResponse.data;
 
-        // 4. Actualizar el estado final en la Pasarela (APROBADO)
-        await updateTransactionStatus({
-            transactionId: pasarelaTxId,
-            status: finalStatus,
-            message: finalMessage,
-            cuentaReferencia: cuentaReferencia
-        });
+    // 3️⃣ Mapear estado del banco a interno
+    const statusMap = {
+      APROBADO: "SUCCESS",
+      RECHAZADO: "FAILED",
+      ERROR: "ERROR",
+    };
+    const finalStatus = statusMap[status] || "UNKNOWN";
 
-        return {
-            success: true,
-            transactionId: pasarelaTxId,
-            message: finalMessage
-        };
+    // 4️⃣ Actualizar en BD
+    await updateTransactionStatus({
+      transactionId: pasarelaTxId,
+      status: finalStatus,
+      message: mensaje,
+      cuentaReferencia: cuentacodigo || null,
+    });
 
-    } catch (error) {
-        // Manejar RECHAZOS (HTTP 400 del banco) o FALLOS (HTTP 500/Red)
-        let finalStatus = 'FALLIDO';
-        let finalMessage = "Error de red o servidor.";
+    return {
+      success: finalStatus === "SUCCESS",
+      transactionId: pasarelaTxId,
+      message: mensaje,
+      errorCode: codigo || null,
+    };
+  } catch (error) {
+    console.error("Fallo durante la llamada al banco:", error.message);
 
-        if (error.response && error.response.status === 400) {
-            // El banco rechaz el pago por fondos insuficientes, etc.
-            finalStatus = 'RECHAZADO';
-            finalMessage = error.response.data.mensaje; 
-        }
-
-        // 4b. Actualizar el estado como RECHAZADO o FALLIDO
-        if (pasarelaTxId) {
-            await updateTransactionStatus({
-                transactionId: pasarelaTxId,
-                status: finalStatus,
-                message: finalMessage
-            });
-        }
-        
-        return { 
-            success: false, 
-            message: finalMessage, 
-            transactionId: pasarelaTxId 
-        };
+    if (error.response?.data) {
+      const safeData = { ...error.response.data };
+      if (safeData.tarjcodigo) safeData.tarjcodigo = "****" + safeData.tarjcodigo.slice(-4);
+      console.error("Respuesta del Banco (data):", safeData);
+    } else {
+      console.error("Sin respuesta del Banco.");
     }
+
+    if (pasarelaTxId) {
+      try {
+        await updateTransactionStatus({
+          transactionId: pasarelaTxId,
+          status: "FALLIDO",
+          message: error.message,
+        });
+      } catch (dbErr) {
+        console.error("No se pudo actualizar estado en BD:", dbErr.message);
+      }
+    }
+
+    return {
+      success: false,
+      transactionId: pasarelaTxId,
+      message: error.message,
+      errorCode: error.response?.data?.codigo || "BANK_ERROR",
+    };
+  }
 }

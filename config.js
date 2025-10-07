@@ -1,5 +1,19 @@
-import dotenv from "dotenv";
+// src/config.js (en tu Pasarela de Pago)
+
+import dotenv from 'dotenv';
 dotenv.config();
-const PORT = process.env.PORT ;
-const BANK_API_URL = process.env.BANK_API_URL;
-export { PORT, BANK_API_URL };
+
+export const dbConfigPasarela = {
+    // ... tus otras variables de conexin (user, password, server, database)
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    server: process.env.DB_SERVER,
+    database: process.env.DB_DATABASE,
+    options: {
+        encrypt: true,
+        enableArithAbort: true,
+        trustServerCertificate: true
+    }
+};
+
+

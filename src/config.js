@@ -3,17 +3,54 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-// Configuracin para que la Pasarela de Pago pueda acceder a la DB
+/**
+ * @module config
+ * @description Módulo central de configuración que carga variables de entorno
+ * desde el archivo .env y define constantes de configuración de la aplicación.
+ */
+
+// --- Documentación de Tipos de Datos (Schemas) ---
+
+/**
+ * @typedef {object} MSSQLOptions
+ * @property {boolean} encrypt - Indica si se usa encriptación para la conexión.
+ * @property {boolean} enableArithAbort - Opción de manejo de errores de SQL Server.
+ * @property {boolean} trustServerCertificate - Si se debe confiar en el certificado del servidor.
+ */
+
+/**
+ * @typedef {object} DBConfig
+ * @property {string} user - Nombre de usuario para la conexión a la base de datos (DB_USER).
+ * @property {string} password - Contraseña del usuario (DB_PASSWORD).
+ * @property {string} server - Dirección o nombre del servidor de base de datos (DB_SERVER).
+ * @property {string} database - Nombre de la base de datos a la que se conecta (DB_DATABASE).
+ * @property {MSSQLOptions} options - Opciones adicionales de conexión para mssql.
+ */
+
+// --- Documentación de Constantes Exportadas ---
+
+/**
+ * Configuración completa para que la Pasarela de Pago acceda a la Base de Datos.
+ * Los valores se obtienen de las variables de entorno.
+ * @constant
+ * @type {DBConfig}
+ */
 export const dbConfigPasarela = {
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     server: process.env.DB_SERVER,
     database: process.env.DB_DATABASE, // La base de datos 'Banco'
     options: {
-        encrypt: false,
-        enableArithAbort: true
+        encrypt: true,
+        enableArithAbort: true,
+        trustServerCertificate: true
     }
 };
 
-// Otras configuraciones del sistema
+/**
+ * URL base de la API del banco externo para autorizar pagos.
+ * Se obtiene de la variable de entorno BANK_API_URL.
+ * @constant
+ * @type {string}
+ */
 export const BANK_API_URL = process.env.BANK_API_URL;

@@ -1,0 +1,13 @@
+{
+    "source": {
+        "include": ["server.js", "src"],
+        "includePattern": ".+\\.js(doc|x)?$",
+        "excludePattern": "(^|\\/|\\\\)_"
+    },
+    "opts": {
+        "encoding": "utf8",
+        "destination": "./docs",
+        "recurse": true,
+        "verbose": true
+    }
+}
