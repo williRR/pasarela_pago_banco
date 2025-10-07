@@ -19,7 +19,7 @@ export async function processPayment({ merchantId, amount, cardNumber, expDate, 
 
   try {
     // 1️⃣ Registrar transacción inicial
-    pasarelaTxId = await registerInitialTransaction({ merchantId, amount, cardNumber });
+    pasarelaTxId = await registerInitialTransaction({ merchantId, amount, cardNumber,});
 
     // 2️⃣ Llamada segura al banco
     const bankResponse = await axios.post(
@@ -27,6 +27,8 @@ export async function processPayment({ merchantId, amount, cardNumber, expDate, 
       {
         tarjcodigo: cardNumber,
         monto: amount,
+        tarjfecha: expDate,
+        tarjcvv: cvv,
       },
       {
         timeout: 5000,
